@@ -26,15 +26,30 @@ cutOutHist <- function(data, l=0, r=Inf, type='h', col='blue') {
   plot(xx, d, type=type, col=col, xlab='Step', ylab='Value')
 }
 
-gatheringInfo <- function(filename) {
+dSamplesFromFile <- function(filename) {
   sample <-sampleSoundObject(readWave(filename))
-  cutOutHist(sample, type='l', col='green')
   difs <- diff(sample)
-  cutOutHist(abs(difs))
-  difs_difs <- diff(difs)
-  cutOutHist(difs_difs, col='red')
-  return (c(difs, difs_difs))
+  difs_difs <- diff(abs(difs))
+  return (c(sample, abs(difs), abs(difs_difs))) # dubious 'abs'
+}
+
+gatheringInfo <- function(filename, sl_l, sl_r) {
+  data <- dSamplesFromFile(filename)
+  
+  cutOutHist(data[1], l=sl_l, r=sl_r, type='l', col='green')
+  cutOutHist(abs(data[2]), l=sl_l, r=sl_r)
+  cutOutHist(data[3], l=sl_l, r=sl_r, col='red')
+  
 }
 
 files <- sapply(c(1,2,3), FUN=function(ihateR) {sprintf('local/nan-ai-file-%d.wav', ihateR)})
-sideRes <- sapply(files, FUN=gatheringInfo)
+slices <- matrix(data=c(34891,35050,41740,42056,0,Inf), byrow = TRUE, nrow = 3, ncol = 2)
+widenSliceBy <- function(slice, wid=500) {
+  return( c(max(0,slice[1]-wid), slice[2]+wid) )
+}
+slices <- t(apply(slices, 1, FUN=widenSliceBy))
+
+test_data <- cbind(files, slices)
+
+sideRes <- apply(test_data, 1, FUN=function(x) {gatheringInfo(x[1],numeric(x[2]), numeric(x[3]))} )
+
