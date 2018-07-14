@@ -43,14 +43,20 @@ gatheringInfo <- function(filename, sl_l, sl_r) {
   return(data)
 }
 
+durationAt16khz <- function(start, end) {
+  return(((end-start) / 16000) * 1000)
+}
+
 files <- sapply(c(1,2,3), FUN=function(ihateR) {sprintf('local/nan-ai-file-%d.wav', ihateR)})
 slices <- matrix(data=c(34891,35050,41740,42056,1,Inf), byrow = TRUE, nrow = 3, ncol = 2)
-widenSliceBy <- function(slice, wid=500) {
+widenSliceBy <- function(slice, wid=3000) {
   return( c(max(0,slice[1]-wid), slice[2]+wid) )
 }
 slices <- t(apply(slices, 1, FUN=widenSliceBy))
 
-test_data <- matrix(cbind(files, slices), ncol=3, nrow=3) # in a perfect world this shouldn't be necessary
+test_data <- matrix(cbind(files, slices), ncol=3, nrow=3) # in a perfect world this wouldn't be necessary
+
+pdf("plots.pdf")
 
 sideRes <- apply(test_data, 1, FUN=function(x) {
     gatheringInfo(
@@ -60,3 +66,11 @@ sideRes <- apply(test_data, 1, FUN=function(x) {
       )
   })
 
+sideRes <- apply(test_data, 1, FUN=function(x) {
+  gatheringInfo(
+    filename = x[1],
+    0, Inf
+  )
+})
+
+dev.off()
