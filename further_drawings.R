@@ -1,4 +1,5 @@
 library(tuneR)
+library(ggplot2)
 
 # sndObj <- readWave('local/nan-ai-file-1.wav')
 # l = length(sndObj@left)
@@ -15,7 +16,7 @@ sampleSoundObject <- function(sndObj) {
   return(s1)  
 }
 
-cutOutHist <- function(data, l=1, r=Inf, type='h', col='blue') {
+cutOutHist <- function(data, l=1, r=Inf, type='h', col='blue', main='') {
   if (r > length(data) ) {
     r=length(data)
   }
@@ -23,7 +24,7 @@ cutOutHist <- function(data, l=1, r=Inf, type='h', col='blue') {
   # timeArray <- (0:(length(data)-1)) / sndObj@samp.rate
   # timeArray <- timeArray * 1000 #scale to milliseconds
   xx <- l + (0:(length(d)-1))
-  plot(xx, d, type=type, col=col, xlab='Step', ylab='Value')
+  plot(xx, d, type=type, col=col, xlab='Step', ylab='Value', main=main)
 }
 
 dSamplesFromFile <- function(filename) {
