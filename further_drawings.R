@@ -40,4 +40,4 @@ cutOutHist(abs(difs), 34750, 35250)
 
 correct <-sampleSoundObject(readWave('local/nan-ai-file-3.wav'))
 difs_correct <- diff(correct)
-cutOutHist(difs_correct)
+cutOutHist(abs(difs_correct))
