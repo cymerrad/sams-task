@@ -15,8 +15,8 @@ sampleSoundObject <- function(sndObj) {
   return(s1)  
 }
 
-cutOutHist <- function(data, l=0, r=Inf, type='h', col='blue') {
-  if (r==Inf) {
+cutOutHist <- function(data, l=1, r=Inf, type='h', col='blue') {
+  if (r > length(data) ) {
     r=length(data)
   }
   d <- data[l:r]
@@ -30,26 +30,33 @@ dSamplesFromFile <- function(filename) {
   sample <-sampleSoundObject(readWave(filename))
   difs <- diff(sample)
   difs_difs <- diff(abs(difs))
-  return (c(sample, abs(difs), abs(difs_difs))) # dubious 'abs'
+  return (list(sample, abs(difs), abs(difs_difs))) # dubious 'abs'
 }
 
 gatheringInfo <- function(filename, sl_l, sl_r) {
   data <- dSamplesFromFile(filename)
   
-  cutOutHist(data[1], l=sl_l, r=sl_r, type='l', col='green')
-  cutOutHist(abs(data[2]), l=sl_l, r=sl_r)
-  cutOutHist(data[3], l=sl_l, r=sl_r, col='red')
+  cutOutHist(data[[1]], l=sl_l, r=sl_r, type='l', col='green')
+  cutOutHist(abs(data[[2]]), l=sl_l, r=sl_r)
+  cutOutHist(data[[3]], l=sl_l, r=sl_r, col='red')
   
+  return(data)
 }
 
 files <- sapply(c(1,2,3), FUN=function(ihateR) {sprintf('local/nan-ai-file-%d.wav', ihateR)})
-slices <- matrix(data=c(34891,35050,41740,42056,0,Inf), byrow = TRUE, nrow = 3, ncol = 2)
+slices <- matrix(data=c(34891,35050,41740,42056,1,Inf), byrow = TRUE, nrow = 3, ncol = 2)
 widenSliceBy <- function(slice, wid=500) {
   return( c(max(0,slice[1]-wid), slice[2]+wid) )
 }
 slices <- t(apply(slices, 1, FUN=widenSliceBy))
 
-test_data <- cbind(files, slices)
+test_data <- matrix(cbind(files, slices), ncol=3, nrow=3) # in a perfect world this shouldn't be necessary
 
-sideRes <- apply(test_data, 1, FUN=function(x) {gatheringInfo(x[1],numeric(x[2]), numeric(x[3]))} )
+sideRes <- apply(test_data, 1, FUN=function(x) {
+    gatheringInfo(
+      filename = x[1],
+      sl_l = as.numeric(x[2]), 
+      sl_r = as.numeric(x[3])
+      )
+  })
 
