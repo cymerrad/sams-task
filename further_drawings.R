@@ -15,7 +15,7 @@ sampleSoundObject <- function(sndObj) {
   return(s1)  
 }
 
-cutOutHist <- function(data, l=0, r=Inf, type='h') {
+cutOutHist <- function(data, l=0, r=Inf, type='h', col='blue') {
   if (r==Inf) {
     r=length(data)
   }
@@ -23,21 +23,18 @@ cutOutHist <- function(data, l=0, r=Inf, type='h') {
   # timeArray <- (0:(length(data)-1)) / sndObj@samp.rate
   # timeArray <- timeArray * 1000 #scale to milliseconds
   xx <- l + (0:(length(d)-1))
-  plot(xx, d, type, col='blue', xlab='Step', ylab='Value')
+  plot(xx, d, type=type, col=col, xlab='Step', ylab='Value')
 }
-s1 <- sampleSoundObject(readWave('local/nan-ai-file-1.wav'))
-difs <- diff(s1)
 
-cutOutHist(s1, 34000, 36000, type='l')
-cutOutHist(difs, 34000, 36000)
+gatheringInfo <- function(filename) {
+  sample <-sampleSoundObject(readWave(filename))
+  cutOutHist(sample, type='l', col='green')
+  difs <- diff(sample)
+  cutOutHist(abs(difs))
+  difs_difs <- diff(difs)
+  cutOutHist(difs_difs, col='red')
+  return (c(difs, difs_difs))
+}
 
-cutOutHist(s1, 34750, 35250, type='l')
-cutOutHist(difs, 34750, 35250)
-
-cutOutHist(abs(difs), 31000, 36000)
-cutOutHist(abs(difs), 34750, 35250)
-
-
-correct <-sampleSoundObject(readWave('local/nan-ai-file-3.wav'))
-difs_correct <- diff(correct)
-cutOutHist(abs(difs_correct))
+files <- sapply(c(1,2,3), FUN=function(ihateR) {sprintf('local/nan-ai-file-%d.wav', ihateR)})
+sideRes <- sapply(files, FUN=gatheringInfo)
