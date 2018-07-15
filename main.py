@@ -2,52 +2,81 @@
 from pylab import *
 from scipy.io import wavfile
 
-_EX_FILES = [
-    "local/440_sine.wav",
+# everything assuming 16kHz
+SAMPLE_RATE = 16000
+DUR_THRESH = 1.2
+
+# two thresholds: delta (change in amp) and duration (shortest distinguishable is 1.2ms (Irwin & Purdy, 1982))
+DELTA_THRESH = 1e-04
+SAMPLE_COUNT_THRESH = (DUR_THRESH / 1000) * SAMPLE_RATE
+
+# one more for differentiating between signal and silence
+STATIC_THRESH = 5e-05
+
+EX_FILES = [
     "local/nan-ai-file-1.wav",
     "local/nan-ai-file-2.wav",
     "local/nan-ai-file-3.wav",
+    "local/440_sine.wav",
 ]
 
-sampFreq, snd = wavfile.read(_EX_FILES[0])
-print("sampFreq {}".format(sampFreq))
-print("sound type {}".format(snd.dtype))
+def read_sound_object(filename):
+    sampFreq, snd = wavfile.read(filename)
+    snd = snd / (2.**15)
+    if len(snd.shape) > 1: # more than one channel
+        snd = snd[:,0]
+    return snd
 
-# convert to range [-1,1]
-snd = snd / (2.**15)
-print("shape {}".format(snd.shape))
+def ranges_below(threshold, arr):
+    rngs = []
+    i = 0
+    curr = False
+    st = 0
+    while i < len(arr):
+        if curr:
+            if arr[i] < threshold:
+                pass
+            else:
+                curr = False
+                rngs.append((st, i))
 
-timeArray = arange(0, snd.shape[0], 1)
-timeArray = timeArray / sampFreq
-timeArray = timeArray * 1000  # scale to milliseconds
+        else:
+            if arr[i] < threshold:
+                curr = True
+                st = i
+            else:
+                pass
+        i += 1
 
-s1 = snd[:,0] 
+    if curr:
+        rngs.append((st,i+1))
 
-plot(timeArray, s1, color='k')
-ylabel('Amplitude')
-xlabel('Time (ms)')
-savefig('plots/plot1.png') # PLOTTING WON'T WORK ON MY MACHINE
+    return rngs
 
-n = len(s1) 
-p = fft(s1) # take the fourier transform 
-nUniquePts = int(ceil((n+1)/2.0))
-p = p[0:nUniquePts]
-p = abs(p)
+def ranges_below2(threshold, threshold_delta, arr):
+    rngs = []
+    i = 0
+    curr = False
+    st = 0
+    delta = 0
+    while i < len(arr):
+        delta = arr[i] - arr[i-1] # loop around at first element
+        if curr:
+            if abs(arr[i]) < threshold and abs(delta) < threshold_delta:
+                pass
+            else:
+                curr = False
+                rngs.append((st, i))
 
-p = p / float(n) # scale by the number of points so that
-                 # the magnitude does not depend on the length 
-                 # of the signal or on its sampling frequency  
-p = p**2  # square it to get the power 
+        else:
+            if abs(arr[i]) < threshold and abs(delta) < threshold_delta:
+                curr = True
+                st = i
+            else:
+                pass
+        i += 1
 
-# multiply by two (see technical document for details)
-# odd nfft excludes Nyquist point
-if n % 2 > 0: # we've got odd number of points fft
-    p[1:len(p)] = p[1:len(p)] * 2
-else:
-    p[1:len(p) -1] = p[1:len(p) - 1] * 2 # we've got even number of points fft
+    if curr:
+        rngs.append((st,i+1))
 
-freqArray = arange(0, nUniquePts, 1.0) * (sampFreq / n);
-plot(freqArray/1000, 10*log10(p), color='k')
-xlabel('Frequency (kHz)')
-ylabel('Power (dB)')
-savefig('plots/plot2.png')
+    return rngs

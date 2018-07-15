@@ -1,15 +1,16 @@
 library(tuneR)
+library(ggplot2)
 
 # everything assuming 16kHz
 SAMPLE_RATE = 16000
 DUR_THRESH = 1.2
 
 # two thresholds: delta (change in amp) and duration (shortest distinguishable is 1.2ms (Irwin & Purdy, 1982))
-DELTA_THRESH = 4.0e-05
+DELTA_THRESH = 1e-04
 SAMPLE_COUNT_THRESH = (DUR_THRESH / 1000) * SAMPLE_RATE
 
 # one more for differentiating between signal and silence
-STATIC_THRESH = 5.0e-05
+STATIC_THRESH = 5e-05
 
 sampleSoundObject <- function(sndObj) {
   l = length(sndObj@left)
@@ -56,19 +57,20 @@ overlapHists <- function(data1, data2, data3=NULL, l=1, r=Inf, main='') {
   
   xx <- (0:(biggerLen-1))
   
-  g <- ggplot(data=NULL, mapping=aes(xx[l:r])) +                    # basic graphical object
-    geom_line(aes(y=data1[l:r]), colour="red", alpha=0.4) +  # first layer
-    geom_line(aes(y=data2[l:r]), colour="green", alpha=0.4)  # second layer
+  g <- ggplot(data=NULL, mapping=aes(xx)) +            
+    geom_line(aes(y=data1), colour="red", alpha=0.4) + 
+    geom_line(aes(y=data2), colour="green", alpha=0.4) +
+    xlim(l,r)
   
   if (!is.null(data3)) {
-    g <- g + geom_line(aes(y=data3[l:r]), colour="blue", alpha=0.4)
+    g <- g + geom_line(aes(y=data3), colour="blue", alpha=0.4)
   }
   
-  flats <- suppTresh(data1, abs(data2))
-  g <- g + geom_line(aes(y=flats[l:r]), colour="purple")
-  g_a <- g + annotate("rect", xmin=34891, xmax=35050, ymin=-Inf, ymax=Inf, alpha=.2, fill="yellow")
+  # flats <- suppTresh(data1, abs(data2))
+  # g <- g + geom_line(aes(y=flats[l:r]), colour="purple")
+  # g_a <- g + annotate("rect", xmin=34891, xmax=35050, ymin=-Inf, ymax=Inf, alpha=.2, fill="yellow")
   
-  g_a
+  g
 }
 
 suppTresh <- function(data1, data2, delta_tresh=DELTA_THRESH, count_tresh=SAMPLE_COUNT_THRESH, static_tresh=STATIC_THRESH) {
@@ -82,7 +84,7 @@ suppTresh <- function(data1, data2, delta_tresh=DELTA_THRESH, count_tresh=SAMPLE
 
 pdf("plots6.pdf")
 
-lapply(lotsofdata, FUN=function(x){ overlapHists(x[[1]], x[[2]], x[[3]]) })
+lapply(lotsofdata, FUN=function(x){ overlapHists( abs( x[[1]] ), abs( x[[2]] ), abs( x[[3]] ) ) })
 
 dev.off()
 
