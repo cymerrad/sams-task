@@ -29,3 +29,5 @@ ggdensity(sample1_silence_pre)
 ggdensity(sample1_silence_post)
 
 # from this stems my main assumption: every other silence in has also the same distribution
+
+afasdfas
