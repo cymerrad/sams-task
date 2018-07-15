@@ -82,11 +82,11 @@ suppTresh <- function(data1, data2, delta_tresh=DELTA_THRESH, count_tresh=SAMPLE
   as.integer(above)
 }
 
-pdf("plots6.pdf")
-
-lapply(lotsofdata, FUN=function(x){ overlapHists( abs( x[[1]] ), abs( x[[2]] ), abs( x[[3]] ) ) })
-
-dev.off()
+# pdf("plots6.pdf")
+# 
+# lapply(lotsofdata, FUN=function(x){ overlapHists( abs( x[[1]] ), abs( x[[2]] ), abs( x[[3]] ) ) })
+# 
+# dev.off()
 
 
 

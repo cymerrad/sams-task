@@ -105,3 +105,4 @@ venv.bak/
 
 # finally some of my own
 local
+*.xls
