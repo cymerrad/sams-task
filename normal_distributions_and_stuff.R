@@ -2,13 +2,7 @@ library("dplyr")
 library("ggpubr")
 library("ggplot2")
 
-sample1 <- lotsofdata[[1]][[1]]
-sample2 <- lotsofdata[[2]][[1]]
-sample3 <- lotsofdata[[3]][[1]]
-
-length(sample2) = length(sample1)
-length(sample3) = length(sample1)
-df <- data.frame(sample1, sample2, sample3)
+sample1 <- lotsofdata[[2]][[1]]
 
 # alright, so I will be using Kolmogorov-Smirnov for comparing "silence" from beggining or end of the tracks to drops in amplitude
 
