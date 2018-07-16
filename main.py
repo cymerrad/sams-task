@@ -6,6 +6,7 @@ from numpy.random import uniform
 from math import floor
 from itertools import groupby
 import numpy
+import argparse
 
 # everything assuming 16kHz
 SAMPLE_RATE = 16000
@@ -21,15 +22,25 @@ SILENCE_THRESH = 5e-04
 
 TEST_COUNT = 5
 
-EX_FILES = [
-    "local/nan-ai-file-1.wav",
-    "local/nan-ai-file-2.wav",
-    "local/nan-ai-file-3.wav",
-]
+# ARGPARSE
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Process some audio files.')
+    parser.add_argument('files', metavar='FILE', type=str, nargs='+',
+                        help='Audio file to be processed')
+    parser.add_argument('--verbose', dest='verbose', action='store_const',
+                        const=True, default=False,
+                        help='Print debug info')
+    global args
+    args = parser.parse_args()
+
+
+def if_verbose_print(data):
+    if args.verbose:
+        print(data)
 
 def read_sound_object(filename):
     sampFreq, snd = wavfile.read(filename)
-    snd = snd / (2.**15)
+    snd = snd / (2.**15) # TODO: dependant on integer type
     if len(snd.shape) > 1: # more than one channel
         snd = snd[:,0]
     return snd
@@ -49,34 +60,6 @@ def ranges_below(threshold, arr):
 
         else:
             if abs(arr[i]) < threshold:
-                curr = True
-                st = i
-            else:
-                pass
-        i += 1
-
-    if curr:
-        rngs.append((st,i+1))
-
-    return rngs
-
-def ranges_below2(threshold, threshold_delta, arr):
-    rngs = []
-    i = 0
-    curr = False
-    st = 0
-    delta = 0
-    while i < len(arr):
-        delta = arr[i] - arr[i-1] # loop around at first element
-        if curr:
-            if abs(arr[i]) < threshold and abs(delta) < threshold_delta:
-                pass
-            else:
-                curr = False
-                rngs.append((st, i))
-
-        else:
-            if abs(arr[i]) < threshold and abs(delta) < threshold_delta:
                 curr = True
                 st = i
             else:
@@ -119,16 +102,17 @@ def silent_ranges(rle, boolz):
 
     return ranges
 
-if __name__ == '__main__':
-    snd = read_sound_object(EX_FILES[0])
+class NonsensicalResult(Exception):
+    pass
 
-    below = [ True if abs(x) < SILENCE_THRESH else False for x in snd ] # those are quiet values
+def data_gather_procedure(samples_arr, TEST_COUNT=TEST_COUNT, SILENCE_THRESH=SILENCE_THRESH, MAGIC_CONSTANT=SAMPLE_COUNT_THRESH):
+    below = [ True if abs(x) < SILENCE_THRESH else False for x in samples_arr ] # those are quiet values
     rle = rle_binary(below) # run length encoding
 
     first_is_true = below[0] == True 
 
-    # this filter ignores all short quiet ranges -> 'short' means < SAMPLE_COUNT_THRESH
-    new_rle_values = [ True if x > SAMPLE_COUNT_THRESH and i%2==(first_is_true^1) else False for i,x in enumerate(rle) ] # yeeeeah...
+    # this filter ignores all short quiet ranges -> 'short' means < MAGIC_CONSTANT
+    new_rle_values = [ True if x > MAGIC_CONSTANT and i%2==(first_is_true^1) else False for i,x in enumerate(rle) ] # yeeeeah...
     filtered_below = inverse_rle(rle, new_rle_values)
     filtered_rle = rle_binary(filtered_below)
 
@@ -137,9 +121,7 @@ if __name__ == '__main__':
 
     filtered_rle_values = [ first_is_true if i%2==0 else first_is_true^True for i in range(len(filtered_rle))]
 
-    rngs = silent_ranges(filtered_rle, filtered_rle_values) # FIXME: horrendously wrong
-
-    assert len(rngs) > 2
+    rngs = silent_ranges(filtered_rle, filtered_rle_values)
 
     silencio = []
     if first_is_true:
@@ -150,17 +132,55 @@ if __name__ == '__main__':
         rngs = rngs[:-1]       
 
     if len(silencio):
-        TEST_COUNT *= 2 # double up the effort!
+        TEST_COUNT *= 2 # we will be comparing only to one side -> double up the effort!
 
-    print("\nComparing samples from ranges ({}) against ({})".format(
+    if_verbose_print("\nComparing samples from ranges ({}) against ({})".format(
         ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in silencio ] ),
         ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in rngs ] ),
         ))
 
+    result = []
     for rr in rngs:
         comp_tests = []
         for t_number in range(TEST_COUNT):
             for sil in silencio:
-                comp_tests += [compare_with_random_sample(rr, sil, snd)]
+                comp_tests += [compare_with_random_sample(rr, sil, samples_arr)]
 
-        print("\nSlice [{}:{}]\n{}".format(rr[0],rr[1], "\n".join( [ "\t{}".format(x) for x in comp_tests ] )))
+        result.append((rr[0], rr[1], comp_tests))
+
+    return result
+
+def data_analyse_procedure(data):
+    # some arbitrary decisions will have to be made
+    # e.g. when is the data in favour of accepting the data?
+    for left, right, stats in data:
+        if_verbose_print("\nSlice [{}:{}]\n{}".format(left,right, "\n".join( [ "\t{}".format(x) for x in stats ] )))
+
+    return (True,)
+
+
+VALID = "VALID"
+INVALID = "INVALID"
+PRINT_OUT = "{}\t{}\t{}\n"
+
+if __name__ == '__main__':
+    for file in args.files:
+        try:
+            sample_arr = read_sound_object(file)
+            res = data_gather_procedure(sample_arr)
+            verdict = data_analyse_procedure(res)
+            if verdict[0]:
+                print(PRINT_OUT.format(file, VALID, ""))
+            else:
+                print(PRINT_OUT.format(file, INVALID, ", ".join(
+                    [ "[{},{}]".format(l,r) for l,r in verdict[1] ]
+                )))
+
+        except ValueError as e:
+            print(PRINT_OUT.format(file, INVALID, "["+str(e)+"]"))
+
+        except NonsensicalResult as e:
+            print(PRINT_OUT.format(file, INVALID, "[ Internal error ]"))
+        
+
+    
