@@ -1,5 +1,4 @@
 scipy
 numpy
 matplotlib
-PyQt5
-ipython
+python-env

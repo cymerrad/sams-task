@@ -2,15 +2,34 @@ library("dplyr")
 library("ggpubr")
 library("ggplot2")
 
-sample1 <- lotsofdata[[2]][[1]]
+sample3 <- lotsofdata[[3]][[1]]
+sample2 <- lotsofdata[[2]][[1]]
+sample1 <- lotsofdata[[1]][[1]]
 
 # alright, so I will be using Kolmogorov-Smirnov for comparing "silence" from beggining or end of the tracks to drops in amplitude
 
 timeArray <- (0:(length(sample1)-1))
-SILENCE_THRESHOLD = 5e-04
+SILENCE_THRESHOLD = 1e-02
 below_thr_bool <- (function(x) abs(x)<SILENCE_THRESHOLD )(sample1)
 
-MAGICAL_CONSTANT = 50
+MAGICAL_CONSTANT = 30
+
+pdf("signals_with_silence_threshold.pdf")
+lapply(list(sample1, sample2, sample3), FUN=function(SAMPLE){ 
+  timeArray <- (0:(length(SAMPLE)-1))
+  below_thr_bool <- (function(x) abs(x)<SILENCE_THRESHOLD )(SAMPLE)
+  below_thr_rle <- rle(below_thr_bool)
+  n_rle_values <- mapply(function(X, Y) { if(X > MAGICAL_CONSTANT && Y) return(TRUE) else return(FALSE) }, X=below_thr_rle$lengths, Y=below_thr_rle$values)
+  n_rle <- below_thr_rle
+  n_rle$values <- n_rle_values
+  new_below <- inverse.rle(n_rle)
+  n_rle_again_lol <-rle(new_below)
+  g <- ggplot(data=NULL, mapping = aes(timeArray)) +
+    geom_line(aes(y=SAMPLE), colour="red", alpha=0.4)
+  g + geom_ribbon(aes(ymin=-0.01 * below_thr_bool, ymax=0.01 * new_below), alpha=0.3, fill="yellow")
+})
+
+dev.off()
 
 g <- ggplot(data=NULL, mapping = aes(timeArray)) +
   geom_line(aes(y=sample1), colour="red", alpha=0.4)
@@ -60,7 +79,7 @@ ranges <- cbind(lefties, righties)
 attr(ranges, "dimnames") <- NULL # another unecessary line BECAUSE R SUCKS
 
 apply(ranges[c(-1,-nrow(ranges)),], 1, FUN=function(x) {
-  rr <- rand_range_from_ofsize(0, 20000, x[2] - x[1] + 1)
+  rr <- rand_range_from_ofsize(0, 10000, x[2] - x[1] + 1)
   cat(sprintf("Attempting [%d:%d] (len %d) with [%d:%d] (len %d)\n", x[1], x[2], (x[2] - x[1] + 1), rr[1], rr[2], (rr[2] - rr[1] +1)))
   if (!is.null(x)) {
     ks.test(sample1[x[1]:x[2]], sample1[rr[1]:rr[2]])

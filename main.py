@@ -1,5 +1,4 @@
-#!/home/radek/Documents/python/sams-task/env/bin/python
-from pylab import *
+from pylab import array
 from scipy.io import wavfile
 from scipy.stats import ks_2samp
 from numpy.random import uniform
@@ -7,22 +6,8 @@ from math import floor
 from itertools import groupby
 import argparse
 import numpy as np
-
-# everything assuming 16kHz
-SAMPLE_RATE = 16000
-DUR_THRESH = 1.2
-
-# two thresholds: delta (change in amp) and duration (shortest distinguishable is 1.2ms (Irwin & Purdy, 1982))
-DELTA_THRESH = 1e-04
-SAMPLE_COUNT_THRESH = (DUR_THRESH / 1000) * SAMPLE_RATE # a.k.a. THE magic constant
-
-# one more for differentiating between signal and silence
-SILENCE_THRESH = 5e-04
-
-TEST_COUNT = 3 # this will be doubled, mind you
-
-ALPHA_CUTOFF = 0.5
-ANOTHER_CUTOFF = 0.3
+import dotenv
+from pathlib import Path
 
 # ARGPARSE
 if __name__ == '__main__':
@@ -32,9 +17,43 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', dest='verbose', action='store_const',
                         const=True, default=False,
                         help='Print debug info')
+    parser.add_argument('--config', dest='config_file', action='store', default='.env',
+                        help='Supersede constants in code from some file. Script uses .env as default anyways.')
     global args
     args = parser.parse_args()
 
+    env_path = Path('.') / args.config_file
+    dotenv.load(env_path)
+    
+    global DUR_THRESH
+    global SILENCE_THRESH
+    global TEST_COUNT
+    global ALPHA_CUTOFF
+    global ANOTHER_CUTOFF
+
+    DUR_THRESH = float(dotenv.get("DUR_THRESH", 1.2))
+    SILENCE_THRESH = float(dotenv.get("SILENCE_THRESH", 1e-02))
+    TEST_COUNT = int(dotenv.get("TEST_COUNT", 3))
+    ALPHA_CUTOFF = float(dotenv.get("ALPHA_CUTOFF", 0.1))
+    ANOTHER_CUTOFF = float(dotenv.get("ANOTHER_CUTOFF", 0.3))
+
+# imported and explained (sort of, kinda, I hope)
+else:
+    # "shortest distinguishable sound interval is 1.2ms" (Irwin & Purdy, 1982)
+    DUR_THRESH = 1.2
+
+    # one more for differentiating between signal and silence
+    SILENCE_THRESH = 1e-02
+
+    # this will be doubled, mind you
+    TEST_COUNT = 3 
+
+    # that p-value related thingy
+    ALPHA_CUTOFF = 0.1
+    ANOTHER_CUTOFF = 0.3 # a.k.a. ANOTHER magic constant
+
+SAMPLE_RATE = 16000
+SAMPLE_COUNT_THRESH = (DUR_THRESH / 1000) * SAMPLE_RATE # a.k.a. THE magic constant
 
 def if_verbose_print(data):
     try:
@@ -43,8 +62,29 @@ def if_verbose_print(data):
     except NameError: # if imported then 'args' is not in the namespace
         print(data)
 
+if_verbose_print((
+    "Using config: {}\n" +
+    "DUR_THRESH = {}\n" +
+    "SILENCE_THRESH = {}\n" +
+    "TEST_COUNT = {}\n" +
+    "ALPHA_CUTOFF = {}\n" +
+    "ANOTHER_CUTOFF = {}\n"
+).format(
+    args.config_file if args else "(none)",
+    DUR_THRESH,
+    SILENCE_THRESH,
+    TEST_COUNT,
+    ALPHA_CUTOFF,
+    ANOTHER_CUTOFF,
+))
+   
 def read_sound_object(filename):
+    global SAMPLE_RATE
     sampFreq, snd = wavfile.read(filename)
+    if sampFreq != SAMPLE_RATE:
+        print("Warning: overriding SAMPLE_RATE")
+        SAMPLE_RATE = sampFreq
+
     snd = snd / (2.**15) # TODO: dependant on integer type
     if len(snd.shape) > 1: # more than one channel
         snd = snd[:,0]
@@ -116,7 +156,7 @@ def data_gather_procedure(samples_arr, TEST_COUNT=TEST_COUNT, SILENCE_THRESH=SIL
 
     first_is_true = below[0] == True 
 
-    # this filter ignores all short quiet ranges -> 'short' means < MAGIC_CONSTANT
+    # this filter ignores all short quiet ranges -> 'short' means smaller than MAGIC_CONSTANT
     new_rle_values = [ True if x > MAGIC_CONSTANT and i%2==(first_is_true^1) else False for i,x in enumerate(rle) ] # yeeeeah...
     filtered_below = inverse_rle(rle, new_rle_values)
     filtered_rle = rle_binary(filtered_below)
@@ -137,7 +177,7 @@ def data_gather_procedure(samples_arr, TEST_COUNT=TEST_COUNT, SILENCE_THRESH=SIL
         rngs = rngs[:-1]       
 
     if len(silencio):
-        TEST_COUNT *= 2 # we will be comparing only to one side -> double up the effort!
+        TEST_COUNT *= 2 # we will be comparing only to one side -> so double up the effort!
 
     if_verbose_print("\nComparing samples from ranges ({}) against ({})".format(
         ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in silencio ] ),
@@ -173,6 +213,8 @@ def data_analyse_procedure(data, ALPHA_CUTOFF=ALPHA_CUTOFF, ANOTHER_MAGIC_CONSTA
         if ( (len(in_favour) / len(s)) > ANOTHER_MAGIC_CONSTANT ): # idk how to make that decision
             if_verbose_print("Marking as an error: [{},{}]".format(left, right))
             errors.append( (left, right) )
+        else:
+            if_verbose_print("Marking as a pass: [{},{}]".format(left, right))
         
     if len(errors) > 0:
         return (False, errors)
@@ -197,7 +239,9 @@ if __name__ == '__main__':
                     file, 
                     INVALID, 
                     "[{},{}]".format(*verdict[1][0]), # only the first one
-                )) 
+                ))
+                if len(verdict[1])>1:
+                    if_verbose_print("{} more potential regions: {}".format( len(verdict[1])-1, verdict[1] )) 
 
         except ValueError as e:
             print(PRINT_OUT.format(file, INVALID, "["+str(e)+"]"))
