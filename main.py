@@ -101,13 +101,7 @@ def compare_with_random_sample(tested, test_source, data):
     return ks_2samp(data[tested[0]:tested[1]], data[rand_range[0]:rand_range[1]])
 
 def rle_binary(bits):
-  # make sure all runs of ones are well-bounded
-  bounded = numpy.hstack(([0], bits, [0]))
-  # get 1 at run starts and -1 at run ends
-  difs = numpy.diff(bounded)
-  run_starts, = numpy.where(difs > 0)
-  run_ends, = numpy.where(difs < 0)
-  return run_ends - run_starts
+    return [ len(list(g)) for k,g in groupby(bits) ]
 
 def inverse_rle(lengths, values):
     result = []
@@ -158,7 +152,7 @@ if __name__ == '__main__':
     if len(silencio):
         TEST_COUNT *= 2 # double up the effort!
 
-    print("\nComparing samples from ranges ({}) to ({})".format(
+    print("\nComparing samples from ranges ({}) against ({})".format(
         ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in silencio ] ),
         ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in rngs ] ),
         ))
