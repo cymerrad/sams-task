@@ -19,6 +19,8 @@ SAMPLE_COUNT_THRESH = (DUR_THRESH / 1000) * SAMPLE_RATE # a.k.a. THE magic const
 STATIC_THRESH = 5e-05
 SILENCE_THRESH = 5e-04
 
+TEST_COUNT = 5
+
 EX_FILES = [
     "local/nan-ai-file-1.wav",
     "local/nan-ai-file-2.wav",
@@ -98,7 +100,7 @@ def compare_with_random_sample(tested, test_source, data):
     rand_range = random_range_from_of_size(test_source[0], test_source[1], (tested[1]-tested[0]) )
     return ks_2samp(data[tested[0]:tested[1]], data[rand_range[0]:rand_range[1]])
 
-def runs_of_ones_array(bits):
+def rle_binary(bits):
   # make sure all runs of ones are well-bounded
   bounded = numpy.hstack(([0], bits, [0]))
   # get 1 at run starts and -1 at run ends
@@ -107,39 +109,64 @@ def runs_of_ones_array(bits):
   run_ends, = numpy.where(difs < 0)
   return run_ends - run_starts
 
-def summarise_into_ranges(rle, boolz):
-    state = True
+def inverse_rle(lengths, values):
+    result = []
+    for z in zip(lengths, values):
+        result += z[0] * [ z[1] ]
+    return result
+
+def silent_ranges(rle, boolz):
     cur = 0
     ranges = []
     for z in zip(rle, boolz):
-        if z[1] != state: # changed state
+        if z[1] == True :
             ranges.append((cur, cur+z[0]))
-            state = not state
-        cur += z[0]
+        cur += z[0] # always move the head to the right
+
     return ranges
 
 if __name__ == '__main__':
     snd = read_sound_object(EX_FILES[0])
-    below = ranges_below(SILENCE_THRESH, snd)
-    rle = runs_of_ones_array(below)
 
-    # TODO this is not verbatim from R code
-    long_below = [ True if x > SAMPLE_COUNT_THRESH and i%2==0 else False for i,x in enumerate(rle) ] # yeeeeah...
+    below = [ True if abs(x) < SILENCE_THRESH else False for x in snd ] # those are quiet values
+    rle = rle_binary(below) # run length encoding
 
-    rngs = [ x for x in below if x[1] - x[0] > SAMPLE_COUNT_THRESH ]
+    first_is_true = below[0] == True 
+
+    # this filter ignores all short quiet ranges -> 'short' means < SAMPLE_COUNT_THRESH
+    new_rle_values = [ True if x > SAMPLE_COUNT_THRESH and i%2==(first_is_true^1) else False for i,x in enumerate(rle) ] # yeeeeah...
+    filtered_below = inverse_rle(rle, new_rle_values)
+    filtered_rle = rle_binary(filtered_below)
+
+    first_is_true = filtered_below[0] == True 
+    last_is_true = first_is_true if len(filtered_rle)%2==1 else first_is_true^True
+
+    filtered_rle_values = [ first_is_true if i%2==0 else first_is_true^True for i in range(len(filtered_rle))]
+
+    rngs = silent_ranges(filtered_rle, filtered_rle_values) # FIXME: horrendously wrong
 
     assert len(rngs) > 2
 
-    intro = rngs[0]
-    outro = rngs[-1]
-    rngs = rngs[1:-1]
+    silencio = []
+    if first_is_true:
+        silencio += [ rngs[0] ]
+        rngs = rngs[1:]
+    if last_is_true:
+        silencio += [ rngs[-1] ]
+        rngs = rngs[:-1]       
+
+    if len(silencio):
+        TEST_COUNT *= 2 # double up the effort!
+
+    print("\nComparing samples from ranges ({}) to ({})".format(
+        ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in silencio ] ),
+        ", ".join( [ "[{},{}]".format(x[0], x[1]) for x in rngs ] ),
+        ))
 
     for rr in rngs:
         comp_tests = []
-        for i in range(3):
-            comp_tests += [compare_with_random_sample(rr, intro, snd)]
-
-        for i in range(3):
-            comp_tests += [compare_with_random_sample(rr, outro, snd)]
+        for t_number in range(TEST_COUNT):
+            for sil in silencio:
+                comp_tests += [compare_with_random_sample(rr, sil, snd)]
 
         print("\nSlice [{}:{}]\n{}".format(rr[0],rr[1], "\n".join( [ "\t{}".format(x) for x in comp_tests ] )))
