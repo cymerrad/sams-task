@@ -5,8 +5,8 @@ from scipy.stats import ks_2samp
 from numpy.random import uniform
 from math import floor
 from itertools import groupby
-import numpy
 import argparse
+import numpy as np
 
 # everything assuming 16kHz
 SAMPLE_RATE = 16000
@@ -17,10 +17,12 @@ DELTA_THRESH = 1e-04
 SAMPLE_COUNT_THRESH = (DUR_THRESH / 1000) * SAMPLE_RATE # a.k.a. THE magic constant
 
 # one more for differentiating between signal and silence
-STATIC_THRESH = 5e-05
 SILENCE_THRESH = 5e-04
 
-TEST_COUNT = 5
+TEST_COUNT = 3 # this will be doubled, mind you
+
+ALPHA_CUTOFF = 0.5
+ANOTHER_CUTOFF = 0.3
 
 # ARGPARSE
 if __name__ == '__main__':
@@ -35,7 +37,10 @@ if __name__ == '__main__':
 
 
 def if_verbose_print(data):
-    if args.verbose:
+    try:
+        if args.verbose:
+            print(data)
+    except NameError: # if imported then 'args' is not in the namespace
         print(data)
 
 def read_sound_object(filename):
@@ -142,7 +147,7 @@ def data_gather_procedure(samples_arr, TEST_COUNT=TEST_COUNT, SILENCE_THRESH=SIL
     result = []
     for rr in rngs:
         comp_tests = []
-        for t_number in range(TEST_COUNT):
+        for _ in range(TEST_COUNT):
             for sil in silencio:
                 comp_tests += [compare_with_random_sample(rr, sil, samples_arr)]
 
@@ -150,18 +155,34 @@ def data_gather_procedure(samples_arr, TEST_COUNT=TEST_COUNT, SILENCE_THRESH=SIL
 
     return result
 
-def data_analyse_procedure(data):
+def data_analyse_procedure(data, ALPHA_CUTOFF=ALPHA_CUTOFF, ANOTHER_MAGIC_CONSTANT=ANOTHER_CUTOFF):
     # some arbitrary decisions will have to be made
     # e.g. when is the data in favour of accepting the data?
+    errors = []
+
     for left, right, stats in data:
-        if_verbose_print("\nSlice [{}:{}]\n{}".format(left,right, "\n".join( [ "\t{}".format(x) for x in stats ] )))
+        s = array([ x.pvalue for x in stats ])
+
+        if len(s) == 0:
+            continue
+
+        if_verbose_print("\nSample [{}:{}] p-values:\n{}".format(left,right, "\n".join( [ "\t{:f}".format(x) for x in s ] )))
+
+        in_favour, = np.where( s > ALPHA_CUTOFF )
+
+        if ( (len(in_favour) / len(s)) > ANOTHER_MAGIC_CONSTANT ): # idk how to make that decision
+            if_verbose_print("Marking as an error: [{},{}]".format(left, right))
+            errors.append( (left, right) )
+        
+    if len(errors) > 0:
+        return (False, errors)
 
     return (True,)
 
 
 VALID = "VALID"
 INVALID = "INVALID"
-PRINT_OUT = "{}\t{}\t{}\n"
+PRINT_OUT = "{}\t{}\t{}"
 
 if __name__ == '__main__':
     for file in args.files:
@@ -172,9 +193,11 @@ if __name__ == '__main__':
             if verdict[0]:
                 print(PRINT_OUT.format(file, VALID, ""))
             else:
-                print(PRINT_OUT.format(file, INVALID, ", ".join(
-                    [ "[{},{}]".format(l,r) for l,r in verdict[1] ]
-                )))
+                print(PRINT_OUT.format(
+                    file, 
+                    INVALID, 
+                    "[{},{}]".format(*verdict[1][0]), # only the first one
+                )) 
 
         except ValueError as e:
             print(PRINT_OUT.format(file, INVALID, "["+str(e)+"]"))
