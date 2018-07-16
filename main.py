@@ -13,12 +13,12 @@ from pathlib import Path
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process some audio files.')
     parser.add_argument('files', metavar='FILE', type=str, nargs='+',
-                        help='Audio file to be processed')
+                        help='Audio filename to be processed')
     parser.add_argument('--verbose', dest='verbose', action='store_const',
                         const=True, default=False,
                         help='Print debug info')
     parser.add_argument('--config', dest='config_file', action='store', default='.env',
-                        help='Supersede constants in code from some file. Script uses .env as default anyways.')
+                        help='Supersede constants in code from some filename. Script uses .env as default anyways.')
     global args
     args = parser.parse_args()
 
@@ -227,16 +227,16 @@ INVALID = "INVALID"
 PRINT_OUT = "{}\t{}\t{}"
 
 if __name__ == '__main__':
-    for file in args.files:
+    for filename in args.files:
         try:
-            sample_arr = read_sound_object(file)
-            res = data_gather_procedure(sample_arr)
-            verdict = data_analyse_procedure(res)
+            sample_arr = read_sound_object(filename)
+            result = data_gather_procedure(sample_arr)
+            verdict = data_analyse_procedure(result)
             if verdict[0]:
-                print(PRINT_OUT.format(file, VALID, ""))
+                print(PRINT_OUT.format(filename, VALID, ""))
             else:
                 print(PRINT_OUT.format(
-                    file, 
+                    filename, 
                     INVALID, 
                     "[{},{}]".format(*verdict[1][0]), # only the first one
                 ))
@@ -244,10 +244,10 @@ if __name__ == '__main__':
                     if_verbose_print("{} more potential regions: {}".format( len(verdict[1])-1, verdict[1] )) 
 
         except ValueError as e:
-            print(PRINT_OUT.format(file, INVALID, "["+str(e)+"]"))
+            print(PRINT_OUT.format(filename, INVALID, "["+str(e)+"]"))
 
         except NonsensicalResult as e:
-            print(PRINT_OUT.format(file, INVALID, "[ Internal error ]"))
+            print(PRINT_OUT.format(filename, INVALID, "[ Internal error ]"))
         
 
     
