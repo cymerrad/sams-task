@@ -2,6 +2,8 @@
 
 ## Installation
 
+Assuming python3 and virtualenv are present:
+
 ```python
 virtualenv -p python3 env
 source env/bin/activate
@@ -19,4 +21,4 @@ My reasoning behind this is that true silence should have the same distribution 
 I'm also assuming that there exists a particularly long moment of silence in the recording, somewhere at the beggining or end.  
 For comparison I'm using Kolmogorov-Smirnov test.  
 Python code is somewhat commented and readable (just start from line 230),
-however, I don't recommend trying to read my R code; it may or may not contain occasional profanities as I really dislike this tool.  
+however, I don't recommend trying to read my R code; it may or may not contain occasional profanities.  
